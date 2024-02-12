@@ -17,18 +17,15 @@ use crate::{
     types::{backend_state::TerminationReason, ClusterName, NodeId, TerminationKind},
 };
 use axum::{
-    extract::{ws::WebSocket, ConnectInfo, Path, Query, State, WebSocketUpgrade},
+    extract::{ws::WebSocket, ConnectInfo, Path, State, WebSocketUpgrade},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use serde::Deserialize;
-use std::net::{IpAddr, SocketAddr};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
+};
 use valuable::Valuable;
-
-#[derive(Deserialize)]
-pub struct DroneSocketQuery {
-    pool: Option<String>,
-}
 
 pub async fn handle_message_from_drone(
     msg: MessageFromDrone,
@@ -226,18 +223,18 @@ pub async fn drone_socket(
 }
 
 pub async fn handle_drone_socket(
-    Path(cluster): Path<String>,
-    Query(query): Query<DroneSocketQuery>,
+    Path(path): Path<HashMap<String, String>>,
     State(controller): State<Controller>,
     connect_info: ConnectInfo<SocketAddr>,
     ws: WebSocketUpgrade,
 ) -> Result<impl IntoResponse, Response> {
-    let cluster: ClusterName = cluster.parse().ok().or_status(
+    let cluster: ClusterName = path.get("cluster").and_then(|c| c.parse().ok()).or_status(
         StatusCode::BAD_REQUEST,
         "Invalid cluster name",
         ApiErrorKind::InvalidClusterName,
     )?;
-    let pool = query.pool;
+    // The pool parameter is optional and parsed manually from the path
+    let pool = path.get("pool").map(|p| p.parse().unwrap_or_default());
     let ip = connect_info.0.ip();
     Ok(ws.on_upgrade(move |socket| drone_socket(cluster, socket, controller, ip, pool)))
 }
