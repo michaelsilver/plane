@@ -233,8 +233,14 @@ pub async fn handle_drone_socket(
         "Invalid cluster name",
         ApiErrorKind::InvalidClusterName,
     )?;
-    // The pool parameter is optional and parsed manually from the path
-    let pool = path.get("pool").map(|p| p.parse().unwrap_or_default());
+    let pool = match path.get("pool") {
+        Some(pool_str) => Some(pool_str.parse().or_status(
+            StatusCode::BAD_REQUEST,
+            "Invalid pool name",
+            ApiErrorKind::InvalidPoolName,
+        )?),
+        None => None,
+    };
     let ip = connect_info.0.ip();
     Ok(ws.on_upgrade(move |socket| drone_socket(cluster, socket, controller, ip, pool)))
 }
