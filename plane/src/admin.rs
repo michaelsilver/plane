@@ -111,6 +111,15 @@ enum AdminCommand {
         /// Use a static connection token for this backend instead of generating them dynamically for each user.
         #[clap(long)]
         static_token: bool,
+
+        /// An optional mount parameter, which can be a string or a boolean. If present without a value, it is interpreted as true.
+        #[clap(
+            long,
+            value_parser = clap::value_parser!(std::option::Option::<String>),
+            require_equals = true,
+            value_name = "MOUNT_PATH"
+        )]
+        mount: Option<Option<String>>,
     },
     Terminate {
         #[clap(long)]
@@ -155,6 +164,7 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             max_idle_seconds,
             id,
             static_token,
+            mount,
         } => {
             let executor_config = ExecutorConfig::from_image_with_defaults(image);
             let max_idle_seconds = max_idle_seconds.unwrap_or(500);
@@ -173,6 +183,11 @@ pub async fn run_admin_command_inner(opts: AdminOpts) -> Result<(), PlaneClientE
             let spawn_request = ConnectRequest {
                 spawn_config: Some(spawn_config),
                 key: key_config,
+                mount: match mount {
+                    Some(Some(path)) => Some(serde_json::Value::String(path)),
+                    Some(None) => Some(serde_json::Value::Bool(true)),
+                    None => None,
+                },
                 ..Default::default()
             };
 

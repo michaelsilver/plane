@@ -4,6 +4,7 @@ use crate::{
     protocol::AcquiredKey,
     types::{BearerToken, ExecutorConfig},
 };
+use anyhow::anyhow;
 use anyhow::Result;
 use bollard::{
     auth::DockerCredentials,
@@ -120,6 +121,7 @@ fn get_container_config_from_executor_config(
     key: Option<&AcquiredKey>,
     static_token: Option<&BearerToken>,
     log_config: Option<&HostConfigLogConfig>,
+    mount_base: Option<String>,
 ) -> Result<bollard::container::Config<String>> {
     let mut env = exec_config.env;
     env.insert("PORT".to_string(), CONTAINER_PORT.to_string());
@@ -145,6 +147,22 @@ fn get_container_config_from_executor_config(
         .into_iter()
         .map(|(k, v)| format!("{}={}", k, v))
         .collect();
+
+    let mut binds: Vec<String> = Vec::new();
+    if let Some(base) = mount_base {
+        if let Some(mount_option) = exec_config.mount {
+            let mount_path = match mount_option {
+                Some(mount_value) => format!("{}/{}", base, mount_value),
+                None => format!("{}/{}", base, key.map_or("", |k| &k.key.name)),
+            };
+            let canonical_mount_path = std::fs::canonicalize(&mount_path)
+                .map_err(|e| anyhow!("Failed to canonicalize mount path: {}", e))?;
+            binds.push(format!(
+                "{}:/plane-data",
+                canonical_mount_path.to_string_lossy()
+            ));
+        }
+    }
 
     Ok(bollard::container::Config {
         image: Some(exec_config.image.clone()),
@@ -191,6 +209,7 @@ fn get_container_config_from_executor_config(
                 hm.insert("size".to_string(), lim.to_string());
                 hm
             }),
+            binds: Some(binds),
             ..Default::default()
         }),
         ..Default::default()
@@ -206,6 +225,7 @@ pub async fn run_container(
     acquired_key: Option<&AcquiredKey>,
     static_token: Option<&BearerToken>,
     log_config: Option<&HostConfigLogConfig>,
+    mount_base: Option<String>,
 ) -> Result<()> {
     let options = bollard::container::CreateContainerOptions {
         name: container_id.to_string(),
@@ -219,6 +239,7 @@ pub async fn run_container(
         acquired_key,
         static_token,
         log_config,
+        mount_base,
     )?;
 
     docker.create_container(Some(options), config).await?;
@@ -335,6 +356,7 @@ mod tests {
         let mut config = get_container_config_from_executor_config(
             &backend_name,
             executor_config.clone(),
+            None,
             None,
             None,
             None,

@@ -72,6 +72,10 @@ enum Command {
         /// Optional log driver configuration, passed to Docker as the `LogConfig` field.
         #[clap(long)]
         log_config: Option<String>,
+
+        /// Optional base directory under which backends are allowed to mount directories.
+        #[clap(long)]
+        mount_base: Option<String>,
     },
     Proxy {
         #[clap(long)]
@@ -170,6 +174,7 @@ async fn run(opts: Opts) -> Result<()> {
             db,
             docker_runtime,
             log_config,
+            mount_base,
         } => {
             let name = name.or_random();
             tracing::info!(%name, "Starting drone");
@@ -179,7 +184,7 @@ async fn run(opts: Opts) -> Result<()> {
 
             let log_config = log_config.map(|s| serde_json::from_str(&s)).transpose()?;
 
-            let docker = PlaneDocker::new(docker, docker_runtime, log_config).await?;
+            let docker = PlaneDocker::new(docker, docker_runtime, log_config, mount_base).await?;
 
             run_drone(client, docker, name, cluster, ip, db.as_deref()).await?;
         }

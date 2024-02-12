@@ -177,6 +177,8 @@ pub struct ExecutorConfig {
     pub env: HashMap<String, String>,
     #[serde(default)]
     pub resource_limits: ResourceLimits,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mount: Option<Option<String>>,
 }
 
 impl ExecutorConfig {
@@ -184,9 +186,10 @@ impl ExecutorConfig {
         Self {
             image: image.into(),
             pull_policy: None,
+            credentials: None,
             env: HashMap::default(),
             resource_limits: ResourceLimits::default(),
-            credentials: None,
+            mount: None,
         }
     }
 }
@@ -266,6 +269,10 @@ pub struct ConnectRequest {
     /// Passed to the backend through the X-Plane-Auth header.
     #[serde(default)]
     pub auth: Map<String, Value>,
+
+    /// If provided, the mount parameter for the backend.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mount: Option<serde_json::Value>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Hash, valuable::Valuable)]

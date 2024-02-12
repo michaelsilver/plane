@@ -32,6 +32,7 @@ pub struct PlaneDocker {
     docker: Docker,
     runtime: Option<String>,
     log_config: Option<HostConfigLogConfig>,
+    mount_base: Option<String>, // Added this line
 }
 
 #[derive(Clone, Debug)]
@@ -50,11 +51,13 @@ impl PlaneDocker {
         docker: Docker,
         runtime: Option<String>,
         log_config: Option<HostConfigLogConfig>,
+        mount_base: Option<String>, // Added this line
     ) -> Result<Self> {
         Ok(Self {
             docker,
             runtime,
             log_config,
+            mount_base, // Added this line
         })
     }
 
@@ -144,6 +147,7 @@ impl PlaneDocker {
             acquired_key,
             static_token,
             self.log_config.as_ref(),
+            self.mount_base.clone(),
         )
         .await?;
         let port = get_port(&self.docker, container_id).await?;
